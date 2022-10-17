@@ -66,7 +66,14 @@ def get_embedder(multires, i=0):
 # Model
 class NeRF(nn.Module):
     def __init__(self, D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
-        """ 
+        """
+        D: depth of the MLP
+        W: input image size
+        input_ch: (x, y, z)
+        input_ch_views: view direction as (θ, φ, z), z is calculated since this is a unit vector
+            hence, sqrt(θ^2 + φ^2 + z^2) == 1
+        output_ch: colour and density, (r, g, b, σ)
+        skip: layer to have residual connection to the original input
         """
         super(NeRF, self).__init__()
         self.D = D
@@ -151,6 +158,18 @@ class NeRF(nn.Module):
 
 # Ray helpers
 def get_rays(H, W, K, c2w):
+    """
+        Get rays in the form of torch Tensor
+
+        Input:
+            H: height
+            W: width
+            K: 
+            c2w: camera-to-world matrix
+        Output:
+            rays_o: origin of the rays (camera location)
+            rays_d: direction of the rays
+    """
     i, j = torch.meshgrid(torch.linspace(0, W-1, W), torch.linspace(0, H-1, H))  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()
@@ -163,6 +182,18 @@ def get_rays(H, W, K, c2w):
 
 
 def get_rays_np(H, W, K, c2w):
+    """
+        Get rays in the form of numpy arrays
+
+        Input:
+            H: height
+            W: width
+            K: 
+            c2w: camera-to-world matrix
+        Output:
+            rays_o: origin of the rays (camera location)
+            rays_d: direction of the rays
+    """
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
     dirs = np.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -np.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
@@ -173,6 +204,16 @@ def get_rays_np(H, W, K, c2w):
 
 
 def ndc_rays(H, W, focal, near, rays_o, rays_d):
+    """
+        Convert rays to Normalised Device Coordinate
+
+        H: height
+        W: width
+        focal: focal lense
+        near: near plane
+        rays_o: origin of the rays (camera location)
+        rays_d: direction of the rays
+    """
     # Shift ray origins to near plane
     t = -(near + rays_o[...,2]) / rays_d[...,2]
     rays_o = rays_o + t[...,None] * rays_d
